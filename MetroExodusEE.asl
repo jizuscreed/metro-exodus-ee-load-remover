@@ -18,6 +18,10 @@
     Verified 0 during gameplay, cutscenes, pause menu and main menu;
     1 during loading screens and while the continue prompt is held.
 
+    STATUS: not runtime-tested. The flag's behaviour was confirmed by watching memory in
+    Cheat Engine, not by timing a full run in LiveSplit. Do not submit runs timed with
+    this script until it has been through a real run and the moderators have signed off.
+
     A second byte at +0x3001CBB tracks it closely but is NOT equivalent: it also fires
     on engine teardown when the game is closed, so it is most likely a broader
     "engine busy / streaming" state of which loading is one case. It is read for

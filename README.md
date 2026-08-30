@@ -7,9 +7,11 @@ The Enhanced Edition had no load remover. Its leaderboard defaults to
 `realtime_noloads`, but with no tooling, runs were retimed by hand in a video editor —
 which is also why IL runs are required to start from chapter select.
 
-> **Status:** verified against EE build 2.0.0.1 (Steam). Offsets confirmed stable across
-> game restarts. Not yet runtime-tested across a full run in LiveSplit, and not yet
-> submitted to the speedrun.com resources for the game.
+> **Status: not runtime-tested.** The loading flag was found and its behaviour confirmed
+> by watching memory in Cheat Engine on EE build 2.0.0.1 (Steam); the offsets are stable
+> across game restarts. No full run has been timed with this script in LiveSplit yet, and
+> it is not on the game's speedrun.com resources page — do not submit runs timed with it
+> until the moderators have signed off.
 
 ## Why the base game's script does not work here
 
