@@ -1,0 +1,9 @@
+# Локальный контекст для Claude Code — не публикуем
+CLAUDE.md
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+desktop.ini
