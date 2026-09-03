@@ -3,51 +3,64 @@
     ---------------------------------------------
     Removes loading time so LiveSplit's Game Time equals LRT (time without loads).
 
-    Supported build : Enhanced Edition, file version 2.0.0.1 (Steam)
-                      ModuleMemorySize 52637696
-    Process         : MetroExodus.exe
+    Process : MetroExodus.exe
+    Builds  : see vars.BUILDS below - one row per verified build
 
     NOTE: the Enhanced Edition uses the same process name as the base game but is a
     completely different build. The base game's load remover reads a hardcoded offset
     that is still a valid mapped address in EE, so pointing it at EE fails SILENTLY -
-    it never errors, it just never pauses. This script gates on ModuleMemorySize and
-    refuses to run on anything it was not verified against.
+    it never errors, it just never pauses. That is why this script identifies the build
+    by ModuleMemorySize and refuses to run on anything it was not verified against:
+    refusing loudly is the only alternative to timing runs wrongly in silence.
 
     The loading flag was found by memory scan against two held states:
       gameplay (0) <-> post-load "press to continue" prompt (1)
     Verified 0 during gameplay, cutscenes, pause menu and main menu;
     1 during loading screens and while the continue prompt is held.
 
-    STATUS: not runtime-tested. The flag's behaviour was confirmed by watching memory in
-    Cheat Engine, not by timing a full run in LiveSplit. Do not submit runs timed with
-    this script until it has been through a real run and the moderators have signed off.
+    A patch changes ModuleMemorySize whether or not the file version is bumped - the
+    2026-09-03 patch grew the image by exactly one 4 KB page and left the version
+    string at 2.0.0.1. It did not move this flag, so both builds share an offset. If a
+    future patch does move it, the offset is per-build: add a state descriptor and a
+    row to vars.BUILDS rather than editing the existing ones, so people who have not
+    updated yet keep working. Re-finding the flag: docs/finding-the-offset.md
 
-    A second byte at +0x3001CBB tracks it closely but is NOT equivalent: it also fires
-    on engine teardown when the game is closed, so it is most likely a broader
-    "engine busy / streaming" state of which loading is one case. It is read for
-    diagnostics only and never drives the timer - ORing the two would remove
-    intervals that are not loads.
+    STATUS: not fully runtime-tested. The flag is confirmed to read correctly on build
+    52641792 (diagnostic log, 2026-09-03), but no full run has been timed with the
+    timer actually running. Do not submit runs timed with this script until that is
+    done and the moderators have signed off.
 */
 
-state("MetroExodus", "EE_2001")
+state("MetroExodus", "EE_52637696")
 {
     // loading flag: 1 = loading, 0 = in game
     byte loading : 0x1659040;
+}
 
-    // broader engine-state byte, diagnostics only - see note above
-    byte streaming : 0x3001CBB;
+state("MetroExodus", "EE_52641792")
+{
+    byte loading : 0x1659040;
 }
 
 startup
 {
-    vars.SUPPORTED_SIZE = 52637696; // EE 2.0.0.1
+    // ModuleMemorySize -> state descriptor version.
+    // The process name is shared with the base game, so the module size is what tells
+    // the builds apart. One row per build actually verified, newest last.
+    vars.BUILDS = new Dictionary<int, string>
+    {
+        { 52637696, "EE_52637696" },  // 2.0.0.1, before the 2026-09-03 patch
+        { 52641792, "EE_52641792" },  // 2.0.0.1, after  the 2026-09-03 patch (+0x1000)
+    };
+
     vars.warned = false;
 
-    settings.Add("logDiag", false, "Debug: log when +3001CBB disagrees with the loading flag");
-    settings.SetToolTip("logDiag",
-        "Diagnostics only, has no effect on timing. Writes to the debug output\n" +
-        "(view it with DebugView). +3001CBB is a broader engine-state byte and is\n" +
-        "expected to disagree sometimes - the log is there to show where.");
+    // An unsupported build is reported to a file as well as a dialog: LiveSplit's
+    // message box opens *behind* an exclusive-fullscreen game, where it is easy to
+    // miss entirely and look exactly like the script doing nothing.
+    vars.ReportPath = System.IO.Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
+        "meee-unsupported-build.txt");
 
     if (timer.CurrentTimingMethod == TimingMethod.RealTime)
     {
@@ -65,19 +78,36 @@ startup
 
 init
 {
-    var size = modules.First().ModuleMemorySize;
+    int size = modules.First().ModuleMemorySize;
 
-    if (size != vars.SUPPORTED_SIZE)
+    if (!vars.BUILDS.ContainsKey(size))
     {
         if (!vars.warned)
         {
             vars.warned = true;
+
+            var known = new List<string>();
+            foreach (var key in vars.BUILDS.Keys)
+                known.Add(key.ToString());
+
+            string report =
+                "Metro Exodus EE load remover - unsupported build\r\n" +
+                "\r\n" +
+                "Attached process reports ModuleMemorySize " + size + ".\r\n" +
+                "Verified builds: " + string.Join(", ", known.ToArray()) + "\r\n" +
+                "\r\n" +
+                "Loads are NOT being removed. Do not submit runs timed with this " +
+                "script until it has been updated for your build.\r\n" +
+                "\r\n" +
+                "The game was most likely patched. The file version is not a reliable " +
+                "check - a patch can change the build without bumping it. Report this " +
+                "number together with \"buildid\" from steamapps\\appmanifest_1449560.acf\r\n";
+
+            try { System.IO.File.WriteAllText(vars.ReportPath, report); }
+            catch (Exception) { }
+
             MessageBox.Show(
-                "This script was built for Metro Exodus: Enhanced Edition 2.0.0.1.\n\n" +
-                "Attached process reports ModuleMemorySize " + size + ", expected " +
-                vars.SUPPORTED_SIZE + ".\n\n" +
-                "Loads will NOT be removed. Do not submit runs timed with this script " +
-                "until it has been updated for your build.",
+                report + "\r\nThis text was also saved to:\r\n" + vars.ReportPath,
                 "LiveSplit | Metro Exodus EE - unsupported build",
                 MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
@@ -85,17 +115,8 @@ init
         throw new Exception("Unsupported build: ModuleMemorySize " + size);
     }
 
-    version = "EE_2001";
+    version = (string)vars.BUILDS[size];
     vars.warned = false;
-}
-
-update
-{
-    if (settings["logDiag"] && current.loading != current.streaming)
-    {
-        print("[MetroExodusEE] +1659040=" + current.loading +
-              " +3001CBB=" + current.streaming);
-    }
 }
 
 isLoading
