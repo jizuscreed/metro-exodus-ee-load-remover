@@ -14,8 +14,9 @@
       * No version string on the state descriptor, so state selection cannot be the
         thing that fails. If this build works and the real one does not, that is the
         answer by itself.
-      * Prints to the Win32 debug output. Read it with DebugView (Sysinternals),
-        Capture -> Capture Win32 enabled.
+      * Writes a log to  <Desktop>\meee-debug.log , truncated each time the script is
+        loaded. The same lines also go to the Win32 debug output, so DebugView still
+        works if you prefer it - but nothing needs to be installed to read the file.
 
     Reading the log:
 
@@ -25,6 +26,9 @@
                                     ModuleMemorySize actually seen, compare with 52637696.
       transition lines           -> what the loading flag does in real time, alongside
                                     the timer phase, timing method and IsGameTimePaused.
+
+    If the log file never appears at all, the script never ran: the path in the
+    Scriptable Auto Splitter component is wrong or the layout was not saved.
 */
 
 state("MetroExodus")
@@ -38,17 +42,40 @@ startup
     vars.ticks = 0;
     vars.announced = false;
 
-    print("[MEEE-DEBUG] startup: script file loaded and parsed");
+    vars.LogPath = System.IO.Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
+        "meee-debug.log");
+
+    // start a fresh file on every script load, so a stale log cannot be mistaken
+    // for the current run
+    try { System.IO.File.WriteAllText(vars.LogPath, ""); } catch (Exception) { }
+
+    vars.Log = (Action<string>)(msg =>
+    {
+        // the debug output costs nothing and keeps DebugView usable as a fallback
+        print("[MEEE-DEBUG] " + msg);
+
+        // a locked or unwritable file must not take the script down mid-run
+        try
+        {
+            System.IO.File.AppendAllText(vars.LogPath,
+                DateTime.Now.ToString("HH:mm:ss.fff") + "  " + msg + Environment.NewLine);
+        }
+        catch (Exception) { }
+    });
+
+    vars.Log("startup: script file loaded and parsed");
+    vars.Log("startup: logging to " + vars.LogPath);
 }
 
 init
 {
     var m = modules.First();
 
-    print("[MEEE-DEBUG] init: ATTACHED to pid " + game.Id + " ('" + game.ProcessName + "')");
-    print("[MEEE-DEBUG] init: main module '" + m.ModuleName +
-          "' base 0x" + m.BaseAddress.ToString("X") +
-          " ModuleMemorySize " + m.ModuleMemorySize + " (expected 52637696)");
+    vars.Log("init: ATTACHED to pid " + game.Id + " ('" + game.ProcessName + "')");
+    vars.Log("init: main module '" + m.ModuleName +
+             "' base 0x" + m.BaseAddress.ToString("X") +
+             " ModuleMemorySize " + m.ModuleMemorySize + " (expected 52637696)");
 
     vars.ticks = 0;
     vars.announced = false;
@@ -61,32 +88,32 @@ update
     if (!vars.announced)
     {
         vars.announced = true;
-        print("[MEEE-DEBUG] update: first tick, loading=" + current.loading +
-              " streaming=" + current.streaming);
+        vars.Log("update: first tick, loading=" + current.loading +
+                 " streaming=" + current.streaming);
     }
 
     if (old.loading != current.loading)
     {
-        print("[MEEE-DEBUG] loading flag " + old.loading + " -> " + current.loading +
-              "  phase=" + timer.CurrentPhase +
-              " method=" + timer.CurrentTimingMethod +
-              " gameTimePaused=" + timer.IsGameTimePaused);
+        vars.Log("loading flag " + old.loading + " -> " + current.loading +
+                 "  phase=" + timer.CurrentPhase +
+                 " method=" + timer.CurrentTimingMethod +
+                 " gameTimePaused=" + timer.IsGameTimePaused);
     }
 
     if (old.streaming != current.streaming)
     {
-        print("[MEEE-DEBUG] streaming byte " + old.streaming + " -> " + current.streaming);
+        vars.Log("streaming byte " + old.streaming + " -> " + current.streaming);
     }
 
     // roughly every 5 seconds at the default refresh rate
     if (vars.ticks % 300 == 0)
     {
-        print("[MEEE-DEBUG] heartbeat " + vars.ticks +
-              " loading=" + current.loading +
-              " streaming=" + current.streaming +
-              " phase=" + timer.CurrentPhase +
-              " method=" + timer.CurrentTimingMethod +
-              " gameTimePaused=" + timer.IsGameTimePaused);
+        vars.Log("heartbeat " + vars.ticks +
+                 " loading=" + current.loading +
+                 " streaming=" + current.streaming +
+                 " phase=" + timer.CurrentPhase +
+                 " method=" + timer.CurrentTimingMethod +
+                 " gameTimePaused=" + timer.IsGameTimePaused);
     }
 }
 
