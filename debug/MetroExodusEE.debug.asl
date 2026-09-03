@@ -135,3 +135,10 @@ isLoading
 {
     return current.loading == 1;
 }
+
+exit
+{
+    // matches MetroExodusEE.asl - see the comment there
+    timer.IsGameTimePaused = false;
+    vars.Log("exit: process gone, released IsGameTimePaused");
+}

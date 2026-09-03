@@ -7,11 +7,12 @@ The Enhanced Edition had no load remover. Its leaderboard defaults to
 `realtime_noloads`, but with no tooling, runs were retimed by hand in a video editor —
 which is also why IL runs are required to start from chapter select.
 
-> **Status: not fully runtime-tested.** The loading flag is confirmed to read correctly
-> on build `52641792` (diagnostic log, 2026-09-03), and the offsets are stable across
-> game restarts. But no full run has been timed with the timer actually running, and the
-> script is not on the game's speedrun.com resources page — do not submit runs timed
-> with it until that is done and the moderators have signed off.
+> **Status: works, not yet sanctioned.** Verified in LiveSplit on build `52641792`
+> (2026-09-04): with the timer running, Game Time freezes for exactly the intervals the
+> loading flag is set and tracks real time 1:1 otherwise, matching to the centisecond
+> against a diagnostic log. It is **not** on the game's speedrun.com resources page —
+> the moderators have not signed off, and the rules still assume manual retiming, so
+> check with them before submitting a run timed with it.
 
 ## Why the base game's script does not work here
 
@@ -59,7 +60,13 @@ The flag is a static global inside the module image, so only the module base mov
 between launches (ASLR); the offset is a constant of the build.
 
 It was verified `0` during gameplay, cutscenes, the pause menu and the main menu, and
-`1` during loading screens and while the post-load "press to continue" prompt is held.
+`1` during loading screens, while the post-load "press to continue" prompt is held, and
+while the game loads the menu on the way out of a level.
+
+The flag is also set while the game shuts down. If the process disappears mid-run the
+script would leave Game Time paused for good — the timer keeps running, Game Time does
+not, and the run quietly finishes short — so an `exit` block releases the pause when the
+process is lost.
 
 ### Supported builds
 
@@ -79,10 +86,16 @@ image by exactly one 4 KB page and left the version string at `2.0.0.1`. Use
 
 ## Timing note for moderators
 
-The loading flag stays set until the player presses continue at the post-load prompt,
-so **time spent sitting at that prompt is removed from LRT**. This matches how the flag
-behaves natively and keeps loads fully excluded, but it does mean idling at the prompt
-is not counted. Worth an explicit ruling before runs are accepted with this script.
+The flag reports "the engine is loading", which is slightly wider than "a loading screen
+is on screen". Two consequences are worth an explicit ruling before runs are accepted
+with this script:
+
+- **The post-load prompt.** The flag stays set until the player presses continue, so
+  time spent sitting at that prompt is removed from LRT. This keeps loads fully
+  excluded, but it does mean idling at the prompt is not counted.
+- **Quitting to the menu.** Leaving a level loads the menu, so that transition counts as
+  a load too. The flag is `0` once you are sitting in the menu — only the transition
+  into it is removed.
 
 ## After a game update
 

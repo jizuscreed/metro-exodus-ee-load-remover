@@ -25,10 +25,11 @@
     row to vars.BUILDS rather than editing the existing ones, so people who have not
     updated yet keep working. Re-finding the flag: docs/finding-the-offset.md
 
-    STATUS: not fully runtime-tested. The flag is confirmed to read correctly on build
-    52641792 (diagnostic log, 2026-09-03), but no full run has been timed with the
-    timer actually running. Do not submit runs timed with this script until that is
-    done and the moderators have signed off.
+    STATUS: verified in LiveSplit on build 52641792 (2026-09-04). With the timer
+    running, Game Time froze for exactly the intervals the flag was set and ran 1:1
+    with real time otherwise - checked against a diagnostic log, matching to the
+    centisecond. Not yet on the game's speedrun.com resources page: the moderators
+    have not signed off, and the rules still assume manual retiming.
 */
 
 state("MetroExodus", "EE_52637696")
@@ -122,4 +123,12 @@ init
 isLoading
 {
     return current.loading == 1;
+}
+
+exit
+{
+    // The flag is set while the game tears down, so losing the process mid-run would
+    // otherwise leave Game Time paused for good: the timer keeps running, Game Time
+    // does not, and the run silently finishes short. Release it on detach.
+    timer.IsGameTimePaused = false;
 }
